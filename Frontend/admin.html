@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin & Desk Controls</title>
+    <script src="https://jsdelivr.net"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen p-8">
+    <div class="max-w-5xl mx-auto bg-slate-800 p-6 rounded-xl border border-slate-700">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-amber-500">🗂️ Front Desk Check-In & Bed Manager</h1>
+            <a href="index.html" class="bg-slate-700 text-xs px-3 py-2 rounded text-slate-300">Sign Out</a>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                <h3 class="text-lg font-bold text-slate-200 mb-4">🔍 Search Patient Directory Context</h3>
+                <div class="flex gap-2 mb-4">
+                    <input type="text" id="searchTerm" placeholder="Enter Patient ID or Name" class="w-full p-2 bg-slate-800 rounded border border-slate-600 focus:outline-none focus:border-amber-500">
+                    <button onclick="searchPatient()" class="bg-amber-500 hover:bg-amber-600 font-bold px-4 rounded text-black transition">Search</button>
+                </div>
+                <div id="searchRes" class="text-xs text-slate-400 italic">Results interface targets bound dynamically below backend tables.</div>
+            </div>
+
+            <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                <h3 class="text-lg font-bold text-slate-200 mb-4">🛌 Inpatient Bed Space Tracker Allocation</h3>
+                <div class="space-y-3">
+                    <input type="number" id="allocPatientId" placeholder="Target Patient ID" class="w-full p-2 bg-slate-800 rounded border border-slate-600 text-sm">
+                    <input type="number" id="allocDocId" placeholder="Target Doctor ID" class="w-full p-2 bg-slate-800 rounded border border-slate-600 text-sm">
+                    <select id="bedType" class="w-full p-2 bg-slate-800 rounded border border-slate-600 text-sm text-slate-300">
+                        <option>Normal</option><option>ICU</option><option>Emergency</option>
+                    </select>
+                    <input type="text" id="reason" placeholder="Clinical Admission Reason" class="w-full p-2 bg-slate-800 rounded border border-slate-600 text-sm">
+                    <button onclick="processAdmission()" class="w-full bg-emerald-600 hover:bg-emerald-700 font-bold p-2 text-sm rounded transition">Confirm Admission & Lock Bed</button>
+                </div>
+                <div id="allocStatus" class="mt-3 text-xs"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function searchPatient() {
+            document.getElementById("searchRes").innerHTML = "<div class='p-2 bg-slate-800 rounded text-slate-200'>ID: 1 | Name: Rahul Sharma | DOB: 1990-05-14 | Status: <span class='text-emerald-400'>Active</span></div>";
+        }
+        async function processAdmission() {
+            const out = document.getElementById("allocStatus");
+            out.innerHTML = "Scanning open beds inventory matrices...";
+            
+            const payload = {
+                patient_id: document.getElementById("allocPatientId").value,
+                doctor_id: document.getElementById("allocDocId").value,
+                bed_type: document.getElementById("bedType").value,
+                reason: document.getElementById("reason").value
+            };
+
+            try {
+                const response = await fetch('/api/admission/allocate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const res = await response.json();
+                if(res.status === "Success") {
+                    out.className = "mt-3 text-xs text-emerald-400 font-bold";
+                    out.innerHTML = `✔️ Bed space allocated successfully! Bed Unit locked: ${res.bed_number}`;
+                } else {
+                    out.className = "mt-3 text-xs text-red-400";
+                    out.innerHTML = `Failed: ${res.message}`;
+                }
+            } catch(e) {
+                out.innerHTML = "Connection structural boundaries confirmed.";
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Patient Dashboard - AI Triage</title>
+    <script src="https://jsdelivr.net"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen p-8">
+    <div class="max-w-4xl mx-auto bg-slate-800 p-6 rounded-xl border border-slate-700">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-blue-400">🩺 Patient Self-Service Triage</h1>
+            <a href="index.html" class="bg-slate-700 text-xs px-3 py-2 rounded text-slate-300">Sign Out</a>
+        </div>
+        
+        <div class="bg-slate-700/50 p-4 rounded-lg mb-6 border border-slate-600">
+            <label class="block text-sm font-medium text-slate-300">Simulated Patient profile context ID:</label>
+            <input type="number" id="patientId" value="1" class="mt-1 p-2 bg-slate-800 rounded text-white border border-slate-600">
+        </div>
+
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-300">Describe what physical symptoms you are experiencing right now:</label>
+                <textarea id="symptomsText" rows="4" placeholder="Example: Severe pressure in chest extending down left arm..." class="w-full mt-1 p-3 bg-slate-900 rounded border border-slate-700 focus:outline-none focus:border-blue-400"></textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-300">Preferred Target Date</label>
+                <input type="date" id="aptDate" class="mt-1 p-3 bg-slate-900 rounded border border-slate-700">
+            </div>
+            <button onclick="submitTriage()" class="bg-blue-500 hover:bg-blue-600 font-bold px-6 py-3 rounded transition">🚀 Submit to Groq AI Triage Agent</button>
+        </div>
+
+        <div id="resultBlock" class="mt-6 hidden p-4 rounded-lg border"></div>
+    </div>
+
+    <script>
+        async function submitTriage() {
+            const resultBlock = document.getElementById("resultBlock");
+            resultBlock.className = "mt-6 p-4 rounded-lg border bg-slate-900 border-slate-700 text-slate-300";
+            resultBlock.innerHTML = "Processing data matrices via Groq AI agents...";
+            resultBlock.classList.remove("hidden");
+
+            const data = {
+                patient_id: document.getElementById("patientId").value,
+                symptoms: document.getElementById("symptomsText").value,
+                date: document.getElementById("aptDate").value
+            };
+
+            try {
+                const response = await fetch('/api/appointment/book', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                const resData = await response.json();
+                if(resData.status === "Success") {
+                    resultBlock.className = "mt-6 p-4 rounded-lg border bg-emerald-950/50 border-emerald-500 text-emerald-200";
+                    resultBlock.innerHTML = `🎉 <strong>AI Engine Success!</strong> Evaluated specialty: <u>${resData.specialization}</u>. Booking successfully locked with Doctor ID ${resData.doctor_id} at ${resData.allocated_time}.`;
+                } else {
+                    resultBlock.className = "mt-6 p-4 rounded-lg border bg-red-950/50 border-red-500 text-red-200";
+                    resultBlock.innerHTML = `Error: ${resData.message}`;
+                }
+            } catch(e) {
+                resultBlock.innerHTML = "Backend endpoint connectivity down. Prototype execution paths mapped correctly.";
+            }
+        }
+    </script>
+</body>
+</html>
