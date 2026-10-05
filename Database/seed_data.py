@@ -1,7 +1,8 @@
+
 """
 Hospital Portal - Demo Data Seeder
 
-Generates Indian demo data using Faker and inserts it
+Generates Indian demo/master data using Faker and inserts it
 into the existing hospital_portal MySQL database.
 
 Generated:
@@ -12,11 +13,24 @@ Generated:
     - 120 Beds
     - Doctor Schedules
     - Portal Users
+    - 1 Admin Notification
 
 IMPORTANT:
     This is DEMO/TEST data only.
+
     Do not use generated credentials or fake patient data
     in a real hospital environment.
+
+    This seeder intentionally does NOT create:
+        - Appointments
+        - Admissions
+        - Diagnoses
+        - Nurse clinical records
+        - Invoices
+        - Discharge records
+
+    Those records should be created by the actual application
+    workflows.
 """
 
 import os
@@ -33,21 +47,25 @@ from werkzeug.security import generate_password_hash
 # CONFIGURATION
 # ============================================================
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))
+)
 
 # Load .env from project root
 load_dotenv(os.path.join(BASE_DIR, ".env"))
+
 
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_USER = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_NAME = os.getenv("DB_NAME", "hospital_portal")
 
+
 # Indian Faker
 fake = Faker("en_IN")
 
-# Reproducible random data.
-# Remove/comment this line if you want different data every run.
+
+# Reproducible demo data
 random.seed(42)
 Faker.seed(42)
 
@@ -60,11 +78,9 @@ NUMBER_OF_PATIENTS = 100
 NUMBER_OF_DOCTORS = 20
 NUMBER_OF_STAFF = 30
 
-# Beds per ward
 BEDS_PER_WARD = 20
 
-# Demo password for ALL generated portal accounts.
-# This is only for local development/testing.
+# Local development/testing password only.
 DEMO_PASSWORD = "Demo@123"
 
 
@@ -140,7 +156,9 @@ DAYS_OF_WEEK = [
 # ============================================================
 
 def get_connection():
-    """Create MySQL connection using .env configuration."""
+    """
+    Create a MySQL connection using values from .env.
+    """
 
     return mysql.connector.connect(
         host=DB_HOST,
@@ -155,9 +173,17 @@ def get_connection():
 # ============================================================
 
 def generate_indian_phone():
-    """Generate a valid-looking Indian mobile number."""
+    """
+    Generate a valid-looking Indian mobile number.
+    """
 
-    first_digit = random.choice(["6", "7", "8", "9"])
+    first_digit = random.choice([
+        "6",
+        "7",
+        "8",
+        "9",
+    ])
+
     remaining = "".join(
         random.choice("0123456789")
         for _ in range(9)
@@ -166,19 +192,21 @@ def generate_indian_phone():
     return first_digit + remaining
 
 
-def generate_username(prefix, number):
-    """Generate predictable demo usernames."""
-
-    return f"{prefix}_{number:03d}"
-
-
 def random_date_of_birth():
-    """Generate a patient DOB approximately between 5 and 80 years ago."""
+    """
+    Generate a patient DOB approximately between
+    5 and 80 years ago.
+    """
 
     today = date.today()
 
-    start_date = today - timedelta(days=80 * 365)
-    end_date = today - timedelta(days=5 * 365)
+    start_date = today - timedelta(
+        days=80 * 365
+    )
+
+    end_date = today - timedelta(
+        days=5 * 365
+    )
 
     return fake.date_between(
         start_date=start_date,
@@ -187,6 +215,11 @@ def random_date_of_birth():
 
 
 def get_gender():
+    """
+    Generate a demo gender value compatible with
+    the patient table ENUM.
+    """
+
     return random.choice([
         "Male",
         "Female",
@@ -194,6 +227,10 @@ def get_gender():
 
 
 def get_blood_group():
+    """
+    Generate a demo blood group.
+    """
+
     return random.choice([
         "A+",
         "A-",
@@ -206,49 +243,59 @@ def get_blood_group():
     ])
 
 
-def get_relation():
-    return random.choice([
-        "Father",
-        "Mother",
-        "Brother",
-        "Sister",
-        "Spouse",
-        "Guardian",
-    ])
-
-
 # ============================================================
 # CLEAR EXISTING DEMO DATA
 # ============================================================
 
 def clear_existing_data(cursor):
     """
-    Remove existing data so the seed can be executed repeatedly.
+    Remove existing data before reseeding.
 
-    Tables are cleared in reverse foreign-key dependency order.
+    Tables are cleared in dependency order so that
+    foreign-key constraints are respected.
+
+    WARNING:
+        This removes application data from the configured
+        hospital_portal database.
+
+        Use this seeder only for development/testing.
     """
 
     print("\nClearing existing data...")
 
     tables = [
+        # Child/dependent tables first
         "app_notification",
         "h_audit_log",
+        "invoice",
+        "admission",
+        "nurse_care_log",
+        "desk_history",
+        "appointment",
+
+        # Portal users depend on people/staff
         "portal_user",
+
+        # Schedule/bed/HR tables
         "doctor_schedule",
         "bed",
-        "ward",
         "staff_shift_hr",
+
+        # Parent/master tables
+        "ward",
         "staff_member",
         "doctor",
         "patient",
     ]
 
     for table in tables:
-        try:
-            cursor.execute(f"DELETE FROM `{table}`")
-            print(f"  Cleared: {table}")
-        except mysql.connector.Error as error:
-            print(f"  Warning: Could not clear {table}: {error}")
+        cursor.execute(
+            f"DELETE FROM `{table}`"
+        )
+
+        print(
+            f"  Cleared: {table}"
+        )
 
 
 # ============================================================
@@ -256,7 +303,11 @@ def clear_existing_data(cursor):
 # ============================================================
 
 def insert_patients(cursor):
-    """Insert 100 Indian patients."""
+    """
+    Insert demo patients.
+
+    Matches the exact patient table schema.
+    """
 
     print("\nCreating patients...")
 
@@ -272,7 +323,10 @@ def insert_patients(cursor):
 
         email = fake.unique.email()
 
-        address = fake.address().replace("\n", ", ")
+        address = fake.address().replace(
+            "\n",
+            ", "
+        )
 
         dob = random_date_of_birth()
 
@@ -281,8 +335,6 @@ def insert_patients(cursor):
         emergency_name = fake.name()
 
         emergency_phone = generate_indian_phone()
-
-        relation = get_relation()
 
         patients.append((
             full_name,
@@ -294,7 +346,6 @@ def insert_patients(cursor):
             blood_group,
             emergency_name,
             emergency_phone,
-            relation,
         ))
 
     query = """
@@ -308,19 +359,30 @@ def insert_patients(cursor):
             address,
             blood_group,
             emergency_contact_name,
-            emergency_contact_phone,
-            emergency_contact_relation
+            emergency_contact_phone
         )
         VALUES
         (
-            %s, %s, %s, %s, %s,
-            %s, %s, %s, %s, %s
+            %s,
+            %s,
+            %s,
+            %s,
+            %s,
+            %s,
+            %s,
+            %s,
+            %s
         )
     """
 
-    cursor.executemany(query, patients)
+    cursor.executemany(
+        query,
+        patients
+    )
 
-    print(f"  Inserted {len(patients)} patients.")
+    print(
+        f"  Inserted {len(patients)} patients."
+    )
 
 
 # ============================================================
@@ -328,18 +390,26 @@ def insert_patients(cursor):
 # ============================================================
 
 def insert_doctors(cursor):
-    """Insert 20 doctors."""
+    """
+    Insert demo doctors.
+    """
 
     print("\nCreating doctors...")
 
     doctors = []
 
-    for index in range(1, NUMBER_OF_DOCTORS + 1):
+    for index in range(
+        1,
+        NUMBER_OF_DOCTORS + 1
+    ):
 
-        full_name = f"Dr. {fake.name()}"
+        full_name = (
+            f"Dr. {fake.name()}"
+        )
 
         specialisation = SPECIALISATIONS[
-            (index - 1) % len(SPECIALISATIONS)
+            (index - 1)
+            % len(SPECIALISATIONS)
         ]
 
         phone = generate_indian_phone()
@@ -371,13 +441,22 @@ def insert_doctors(cursor):
         )
         VALUES
         (
-            %s, %s, %s, %s, %s
+            %s,
+            %s,
+            %s,
+            %s,
+            %s
         )
     """
 
-    cursor.executemany(query, doctors)
+    cursor.executemany(
+        query,
+        doctors
+    )
 
-    print(f"  Inserted {len(doctors)} doctors.")
+    print(
+        f"  Inserted {len(doctors)} doctors."
+    )
 
 
 # ============================================================
@@ -385,7 +464,12 @@ def insert_doctors(cursor):
 # ============================================================
 
 def insert_staff(cursor):
-    """Insert 30 staff members."""
+    """
+    Insert demo hospital staff.
+
+    Roles are restricted to the values defined
+    by the staff_member table ENUM.
+    """
 
     print("\nCreating staff members...")
 
@@ -402,12 +486,16 @@ def insert_staff(cursor):
         "Admin",
     ]
 
-    for index in range(1, NUMBER_OF_STAFF + 1):
+    for index in range(
+        1,
+        NUMBER_OF_STAFF + 1
+    ):
 
         full_name = fake.name()
 
         role_type = role_pattern[
-            (index - 1) % len(role_pattern)
+            (index - 1)
+            % len(role_pattern)
         ]
 
         phone = generate_indian_phone()
@@ -433,13 +521,21 @@ def insert_staff(cursor):
         )
         VALUES
         (
-            %s, %s, %s, %s
+            %s,
+            %s,
+            %s,
+            %s
         )
     """
 
-    cursor.executemany(query, staff)
+    cursor.executemany(
+        query,
+        staff
+    )
 
-    print(f"  Inserted {len(staff)} staff members.")
+    print(
+        f"  Inserted {len(staff)} staff members."
+    )
 
 
 # ============================================================
@@ -447,7 +543,12 @@ def insert_staff(cursor):
 # ============================================================
 
 def insert_wards(cursor):
-    """Insert hospital wards."""
+    """
+    Insert hospital wards.
+
+    Uses floor_number because that is the exact
+    column name in the database schema.
+    """
 
     print("\nCreating wards...")
 
@@ -456,12 +557,15 @@ def insert_wards(cursor):
         (
             ward_name,
             ward_type,
-            floor,
+            floor_number,
             is_active
         )
         VALUES
         (
-            %s, %s, %s, %s
+            %s,
+            %s,
+            %s,
+            %s
         )
     """
 
@@ -476,9 +580,14 @@ def insert_wards(cursor):
             1,
         ))
 
-    cursor.executemany(query, ward_data)
+    cursor.executemany(
+        query,
+        ward_data
+    )
 
-    print(f"  Inserted {len(ward_data)} wards.")
+    print(
+        f"  Inserted {len(ward_data)} wards."
+    )
 
 
 # ============================================================
@@ -486,12 +595,17 @@ def insert_wards(cursor):
 # ============================================================
 
 def insert_beds(cursor):
-    """Insert beds for every ward."""
+    """
+    Insert beds for every ward.
+    """
 
     print("\nCreating beds...")
 
     cursor.execute("""
-        SELECT ward_id, ward_name, ward_type
+        SELECT
+            ward_id,
+            ward_name,
+            ward_type
         FROM ward
         ORDER BY ward_id
     """)
@@ -508,7 +622,10 @@ def insert_beds(cursor):
         )
         VALUES
         (
-            %s, %s, %s, %s
+            %s,
+            %s,
+            %s,
+            %s
         )
     """
 
@@ -516,18 +633,16 @@ def insert_beds(cursor):
 
     for ward_id, ward_name, ward_type in wards:
 
-        # Find matching bed type
         bed_type = "Normal"
 
         for config in WARD_CONFIG:
 
             if config["type"] == ward_type:
+
                 bed_type = config["bed_type"]
+
                 break
 
-        prefix = ward_name.upper()
-
-        # Create simple prefix
         if ward_type == "General":
             prefix = "GEN"
 
@@ -543,7 +658,16 @@ def insert_beds(cursor):
         elif ward_type == "Maternity":
             prefix = "MAT"
 
-        for bed_index in range(1, BEDS_PER_WARD + 1):
+        elif ward_type == "Surgical":
+            prefix = "SUR"
+
+        else:
+            prefix = "BED"
+
+        for bed_index in range(
+            1,
+            BEDS_PER_WARD + 1
+        ):
 
             bed_number = (
                 f"{prefix}-{bed_index:03d}"
@@ -556,9 +680,14 @@ def insert_beds(cursor):
                 "Available",
             ))
 
-    cursor.executemany(query, beds)
+    cursor.executemany(
+        query,
+        beds
+    )
 
-    print(f"  Inserted {len(beds)} beds.")
+    print(
+        f"  Inserted {len(beds)} beds."
+    )
 
 
 # ============================================================
@@ -611,13 +740,23 @@ def insert_doctor_schedules(cursor):
         )
         VALUES
         (
-            %s, %s, %s, %s, %s, %s
+            %s,
+            %s,
+            %s,
+            %s,
+            %s,
+            %s
         )
     """
 
-    cursor.executemany(query, schedules)
+    cursor.executemany(
+        query,
+        schedules
+    )
 
-    print(f"  Inserted {len(schedules)} schedule records.")
+    print(
+        f"  Inserted {len(schedules)} schedule records."
+    )
 
 
 # ============================================================
@@ -629,27 +768,30 @@ def insert_portal_users(cursor):
     Create login accounts for:
 
         - 1 Admin
+        - Other staff members
         - 20 Doctors
-        - 30 Staff
         - 100 Patients
+
+    All accounts use the same development password.
     """
 
     print("\nCreating portal users...")
 
     users = []
 
-    # Generate ONE hash and reuse it for demo accounts.
-    # Real authentication should use proper individual passwords.
+    # Generate one password hash for demo accounts.
     demo_password_hash = generate_password_hash(
         DEMO_PASSWORD
     )
 
     # --------------------------------------------------------
-    # ADMIN / STAFF USERS
+    # STAFF USERS
     # --------------------------------------------------------
 
     cursor.execute("""
-        SELECT staff_id, role_type
+        SELECT
+            staff_id,
+            role_type
         FROM staff_member
         ORDER BY staff_id
     """)
@@ -658,13 +800,18 @@ def insert_portal_users(cursor):
 
     admin_created = False
 
-    for index, (staff_id, role_type) in enumerate(
+    for index, (
+        staff_id,
+        role_type
+    ) in enumerate(
         staff_rows,
         start=1
     ):
 
-        # Only one admin account.
-        if role_type == "Admin" and not admin_created:
+        if (
+            role_type == "Admin"
+            and not admin_created
+        ):
 
             username = "admin_demo"
 
@@ -681,9 +828,6 @@ def insert_portal_users(cursor):
 
         else:
 
-            # Portal user type must match schema ENUM.
-            user_type = role_type
-
             username = (
                 f"{role_type.lower()}_{index:03d}"
             )
@@ -691,7 +835,7 @@ def insert_portal_users(cursor):
             users.append((
                 username,
                 demo_password_hash,
-                user_type,
+                role_type,
                 None,
                 None,
                 staff_id,
@@ -709,7 +853,9 @@ def insert_portal_users(cursor):
 
     doctor_rows = cursor.fetchall()
 
-    for index, (doctor_id,) in enumerate(
+    for index, (
+        doctor_id,
+    ) in enumerate(
         doctor_rows,
         start=1
     ):
@@ -739,7 +885,9 @@ def insert_portal_users(cursor):
 
     patient_rows = cursor.fetchall()
 
-    for index, (patient_id,) in enumerate(
+    for index, (
+        patient_id,
+    ) in enumerate(
         patient_rows,
         start=1
     ):
@@ -758,7 +906,7 @@ def insert_portal_users(cursor):
         ))
 
     # --------------------------------------------------------
-    # INSERT
+    # INSERT USERS
     # --------------------------------------------------------
 
     query = """
@@ -773,13 +921,23 @@ def insert_portal_users(cursor):
         )
         VALUES
         (
-            %s, %s, %s, %s, %s, %s
+            %s,
+            %s,
+            %s,
+            %s,
+            %s,
+            %s
         )
     """
 
-    cursor.executemany(query, users)
+    cursor.executemany(
+        query,
+        users
+    )
 
-    print(f"  Inserted {len(users)} portal users.")
+    print(
+        f"  Inserted {len(users)} portal users."
+    )
 
 
 # ============================================================
@@ -787,7 +945,9 @@ def insert_portal_users(cursor):
 # ============================================================
 
 def insert_initial_notification(cursor):
-    """Create an initial notification for the admin."""
+    """
+    Create one initial notification for the demo admin.
+    """
 
     print("\nCreating initial notification...")
 
@@ -801,7 +961,12 @@ def insert_initial_notification(cursor):
     admin = cursor.fetchone()
 
     if not admin:
-        print("  Admin user not found. Skipping notification.")
+
+        print(
+            "  Admin user not found. "
+            "Skipping notification."
+        )
+
         return
 
     admin_user_id = admin[0]
@@ -819,10 +984,12 @@ def insert_initial_notification(cursor):
         )
     """, (
         admin_user_id,
-        "Hospital Portal demo data has been initialized successfully."
+        "Hospital Portal demo data has been initialized successfully.",
     ))
 
-    print("  Initial admin notification created.")
+    print(
+        "  Initial admin notification created."
+    )
 
 
 # ============================================================
@@ -830,7 +997,9 @@ def insert_initial_notification(cursor):
 # ============================================================
 
 def verify_data(cursor):
-    """Print record counts after seeding."""
+    """
+    Print record counts after successful seeding.
+    """
 
     print("\n" + "=" * 60)
     print("DATABASE SEED VERIFICATION")
@@ -847,6 +1016,23 @@ def verify_data(cursor):
         "app_notification",
     ]
 
+    expected_counts = {
+        "patient": NUMBER_OF_PATIENTS,
+        "doctor": NUMBER_OF_DOCTORS,
+        "staff_member": NUMBER_OF_STAFF,
+        "ward": len(WARD_CONFIG),
+        "bed": (
+            len(WARD_CONFIG)
+            * BEDS_PER_WARD
+        ),
+        "doctor_schedule": (
+            NUMBER_OF_DOCTORS
+            * len(DAYS_OF_WEEK)
+        ),
+    }
+
+    verification_passed = True
+
     for table in tables:
 
         cursor.execute(
@@ -855,11 +1041,50 @@ def verify_data(cursor):
 
         count = cursor.fetchone()[0]
 
-        print(
-            f"{table:<25} : {count}"
+        expected = expected_counts.get(
+            table
         )
 
+        if expected is not None:
+
+            status = (
+                "OK"
+                if count == expected
+                else "CHECK"
+            )
+
+            if count != expected:
+                verification_passed = False
+
+            print(
+                f"{table:<25} : "
+                f"{count:<5} "
+                f"(expected {expected}) "
+                f"[{status}]"
+            )
+
+        else:
+
+            print(
+                f"{table:<25} : "
+                f"{count}"
+            )
+
     print("=" * 60)
+
+    if verification_passed:
+
+        print(
+            "Seed verification passed."
+        )
+
+    else:
+
+        print(
+            "Seed verification found unexpected counts."
+        )
+
+    return verification_passed
 
 
 # ============================================================
@@ -872,7 +1097,7 @@ def main():
     print("HOSPITAL PORTAL - INDIAN DEMO DATA SEEDER")
     print("=" * 60)
 
-    print("\nDatabase:")
+    print("\nDatabase configuration:")
     print(f"  Host     : {DB_HOST}")
     print(f"  User     : {DB_USER}")
     print(f"  Database : {DB_NAME}")
@@ -892,7 +1117,9 @@ def main():
 
         cursor = connection.cursor()
 
-        print("MySQL connection successful.")
+        print(
+            "MySQL connection successful."
+        )
 
         # ----------------------------------------------------
         # CLEAR OLD DATA
@@ -901,7 +1128,7 @@ def main():
         clear_existing_data(cursor)
 
         # ----------------------------------------------------
-        # INSERT DATA
+        # INSERT MASTER DATA
         # ----------------------------------------------------
 
         insert_patients(cursor)
@@ -926,28 +1153,65 @@ def main():
 
         connection.commit()
 
-        print("\nAll demo data committed successfully.")
+        print(
+            "\nAll demo data committed successfully."
+        )
 
         # ----------------------------------------------------
         # VERIFY
         # ----------------------------------------------------
 
-        verify_data(cursor)
+        verification_passed = verify_data(
+            cursor
+        )
 
-        print("\nSeed completed successfully.")
+        if verification_passed:
+
+            print(
+                "\nSeed completed successfully."
+            )
+
+        else:
+
+            print(
+                "\nSeed completed, but "
+                "verification requires review."
+            )
+
+        # ----------------------------------------------------
+        # DEMO LOGIN INFORMATION
+        # ----------------------------------------------------
 
         print("\nDemo login password:")
-        print("  Demo@123")
+        print(
+            f"  {DEMO_PASSWORD}"
+        )
 
         print("\nExample usernames:")
-        print("  admin_demo")
-        print("  doctor_001")
-        print("  patient_001")
-        print("  receptionist_001")
-        print("  nurse_001")
 
         print(
-            "\nIMPORTANT: These are development/test credentials only."
+            "  admin_demo"
+        )
+
+        print(
+            "  doctor_001"
+        )
+
+        print(
+            "  patient_001"
+        )
+
+        print(
+            "  receptionist_001"
+        )
+
+        print(
+            "  nurse_001"
+        )
+
+        print(
+            "\nIMPORTANT: "
+            "These are development/test credentials only."
         )
 
     except mysql.connector.Error as error:
@@ -958,7 +1222,9 @@ def main():
         if connection:
             connection.rollback()
 
-        print("\nTransaction rolled back.")
+        print(
+            "\nTransaction rolled back."
+        )
 
     except Exception as error:
 
@@ -968,7 +1234,9 @@ def main():
         if connection:
             connection.rollback()
 
-        print("\nTransaction rolled back.")
+        print(
+            "\nTransaction rolled back."
+        )
 
     finally:
 
@@ -978,7 +1246,9 @@ def main():
         if connection:
             connection.close()
 
-        print("\nDatabase connection closed.")
+        print(
+            "\nDatabase connection closed."
+        )
 
 
 # ============================================================
